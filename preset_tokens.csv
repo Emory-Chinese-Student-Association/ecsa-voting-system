@@ -1,0 +1,9 @@
+token,role,weight,note
+C-PRESET001ABCDEF,chair,5,主席团成员1
+C-PRESET002GHIJKL,chair,5,主席团成员2
+M-PRESET001MNOPQR,minister,2,部长1
+M-PRESET002STUVWX,minister,2,部长2
+M-PRESET003YZ2345,minister,2,部长3
+U-PRESET001678ABC,member,1,部员1
+U-PRESET002DEFGHI,member,1,部员2
+U-PRESET003JKLMNO,member,1,部员3
