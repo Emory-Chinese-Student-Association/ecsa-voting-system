@@ -427,7 +427,7 @@ def default_role_weight(role: str) -> int:
 
 
 def role_display_name(role: str) -> str:
-    return {"chair": "执行委员会", "minister": "部长", "member": "部员"}.get(role, role)
+    return {"chair": "主席团", "minister": "部长", "member": "部员"}.get(role, role)
 
 
 def format_role_weights(role_weights: Dict[str, int]) -> str:
@@ -526,6 +526,22 @@ def tally_results_weighted() -> List[Dict[str, Any]]:
             "max_weight": max_weight,
         })
 
+    return sections
+
+
+def summarize_public_results() -> List[Dict[str, Any]]:
+    sections = []
+    for section in tally_results_weighted():
+        category = section["category"]
+        winners_count = min(category.max_choices, len(section["results"]))
+        winners = []
+        if section["total_weight"] > 0:
+            winners = [candidate for candidate, _ in section["results"][:winners_count]]
+        sections.append({
+            "category": category,
+            "winners": winners,
+            "has_votes": section["total_weight"] > 0,
+        })
     return sections
 
 def export_tokens_csv(filepath: str) -> None:
@@ -1252,6 +1268,40 @@ TEMPLATE_BASE = """
       transition: width 0.5s ease;
     }
 
+    .public-result-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .public-result-item {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      padding: 0.95rem 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, rgba(30, 58, 95, 0.03) 0%, rgba(209, 164, 108, 0.08) 100%);
+    }
+
+    .public-result-rank {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: var(--primary);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .public-result-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
     .alert {
       padding: 1rem 1.25rem;
       border-radius: var(--radius-sm);
@@ -1373,7 +1423,7 @@ TEMPLATE_BASE = """
     </main>
 
     <footer class="footer">
-      Emory Chinese Students Association © 2025
+      Emory Chinese Student Association © 2025
     </footer>
   </div>
 </body>
@@ -1418,7 +1468,7 @@ def vote_home():
     return render_template_string(
         TEMPLATE_BASE,
         title="ECSA 内部选举",
-        subtitle="Emory Chinese Students Association",
+        subtitle="Emory Chinese Student Association",
         msg=None,
         body=body
     )
@@ -1754,6 +1804,81 @@ def results():
     )
 
 
+@app.get(BASE_PREFIX + "/final-results")
+def final_results():
+    status = get_state()
+    if status != "closed":
+        body = f"""
+        <div class="card">
+          <div class="card-title">最终结果尚未公布</div>
+          <p class="info-text">投票结束后，系统会在这里公开最终结果。本页面不需要管理员密码，也不会显示具体票数。</p>
+        </div>
+        <div style="margin-top: 1rem;">
+          <a href="{BASE_PREFIX}" class="btn btn-secondary">← 返回首页</a>
+        </div>
+        """
+        return render_template_string(
+            TEMPLATE_BASE,
+            title="最终结果",
+            subtitle="投票结束后公开",
+            msg=None,
+            body=body
+        )
+
+    public_sections = summarize_public_results()
+    sections_html = ""
+    for section in public_sections:
+        category = section["category"]
+        if section["has_votes"]:
+            winners_html = ""
+            for idx, candidate in enumerate(section["winners"], start=1):
+                winners_html += f"""
+                <div class="public-result-item">
+                  <span class="public-result-rank">{idx}</span>
+                  <span class="public-result-name">{html.escape(candidate)}</span>
+                </div>
+                """
+            content_html = f"""
+            <div class="public-result-list">
+              {winners_html}
+            </div>
+            """
+        else:
+            content_html = '<p class="info-text" style="margin-bottom: 0;">该类别暂无有效投票记录。</p>'
+
+        sections_html += f"""
+        <div class="card">
+          <div class="badge-row">
+            <span class="weight-badge">{html.escape(category.label)}</span>
+            <span class="role-badge role-member">公布结果 {category.max_choices} 人</span>
+          </div>
+          {content_html}
+        </div>
+        """
+
+    body = f"""
+    <div class="card">
+      <div class="badge-row">
+        <span class="status-badge status-closed">
+          <span class="status-dot"></span>
+          投票已结束
+        </span>
+        <span class="weight-badge">{len(public_sections)} 个投票类别</span>
+      </div>
+      <p class="info-text" style="margin-bottom: 0;">本页面仅公布各类别最终结果，不展示具体票数或统计明细。</p>
+    </div>
+
+    {sections_html}
+    """
+    return render_template_string(
+        TEMPLATE_BASE,
+        title="最终结果",
+        subtitle="公开结果页面",
+        msg=None,
+        body=body
+    )
+
+
 @app.get(BASE_PREFIX + "/admin")
 def admin_home():
     require_admin()
@@ -1797,7 +1922,11 @@ def admin_home():
 
     <div class="card">
       <div class="card-title">查看结果</div>
-      <a href="{BASE_PREFIX}/results" class="btn btn-primary">管理员预览结果</a>
+      <div class="admin-grid">
+        <a href="{BASE_PREFIX}/results?pw={CONFIG.ADMIN_PASSWORD}" class="btn btn-primary">管理员预览结果</a>
+        <a href="{BASE_PREFIX}/final-results" class="btn btn-secondary">最终查看结果</a>
+      </div>
+      <p class="info-text">最终查看结果页在投票结束后开放，不需要管理员密码，且不显示具体票数。</p>
     </div>
     """
     return render_template_string(
