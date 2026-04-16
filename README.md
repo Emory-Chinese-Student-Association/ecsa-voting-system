@@ -1,6 +1,6 @@
 # ECSA Voting System
 
-A lightweight, token-based weighted voting system built with Flask and SQLite. Supports role-based vote weights and admin management.
+A lightweight, token-based weighted voting system built with Flask and SQLite. Supports role-based vote weights, multi-category ballots, and admin management.
 
 ## ✨ Features
 
@@ -9,8 +9,9 @@ A lightweight, token-based weighted voting system built with Flask and SQLite. S
   - Chair: ×5
   - Minister: ×2
   - Member: ×1
+- 🗂️ **Multi-category Ballots** — Configure multiple election categories, each with its own candidates and selection limit
 - 🔐 **Admin Dashboard** — Password-protected management panel
-- 📊 **Real-time Results** — Admin preview during voting, public results after closing
+- 📊 **Real-time Results** — Admin preview during voting, public results after closing, grouped by category
 - 📁 **CSV Import/Export** — Import candidates and tokens, export results
 - 🎨 **Modern UI** — Clean, responsive design with Chinese language support
 
@@ -55,27 +56,51 @@ Then run:
 pip install -r requirements.txt
 ```
 
-### 3. Configure candidates
+### 3. Configure ballot categories and candidates
 
-Edit `candidates.csv`:
+Edit `ballot_rules.csv` to define each voting category, how many people each voter must select in that category, and the role-based weight used in that category:
 
 ```csv
-CANDIDATES
-Candidate A
-Candidate B
-Candidate C
+category_key,category_label,max_choices,chair_weight,minister_weight,member_weight
+presidium,Presidium 主席团,2,5,3,1
+academic_career_development,Chair of Academic and Career Development 学术与职业发展部部长,2,3,2,1
+publicity,Chair of Publicity 宣传部部长,2,3,2,1
+events_programming,Chair of Events Programming 活动部部长,2,3,2,1
+external_affairs,Chair of External Affairs 外联部部长,2,3,2,1
 ```
+
+Then edit `candidates.csv` to assign candidates to each category:
+
+```csv
+category_key,candidate
+presidium,Candidate A
+presidium,Candidate B
+academic_career_development,Candidate C
+publicity,Candidate D
+events_programming,Candidate E
+external_affairs,Candidate F
+```
+
+Rules:
+
+- `category_key` must match between `ballot_rules.csv` and `candidates.csv`
+- `max_choices` means the exact number of candidates each voter must select in that category
+- `chair_weight`, `minister_weight`, and `member_weight` control how much each role counts in that category
+- Each category must have at least one candidate
+- `max_choices` cannot be greater than the number of candidates in that category
 
 ### 4. Configure tokens (Optional)
 
 If you want to use preset tokens, edit `preset_tokens.csv`:
 
 ```csv
-token,role,weight,note
-C-YOURTOKEN1234567,chair,5,Chair 1
-M-YOURTOKEN2345678,minister,2,Minister 1
-U-YOURTOKEN3456789,member,1,Member 1
+token,role,note
+C-YOURTOKEN1234567,chair,Chair 1
+M-YOURTOKEN2345678,minister,Minister 1
+U-YOURTOKEN3456789,member,Member 1
 ```
+
+The preset token file no longer needs a `weight` column. Default token weight is inferred from `role`, while the actual vote weight for each category comes from `ballot_rules.csv`.
 
 If this file is empty or doesn't exist, tokens will be auto-generated.
 
